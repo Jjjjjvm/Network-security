@@ -1,197 +1,101 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
+  <title>أداة فحص الشبكة</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>أداة فحص الشبكة والمنافذ المتقدمة</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     body {
-      font-family: 'Cairo', sans-serif;
-      background: linear-gradient(135deg, #0f172a, #1e293b);
-      color: #e0e0e0;
-    }
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #1e293b;
-    }
-    ::-webkit-scrollbar-thumb {
-      background-color: #0ea5e9;
-      border-radius: 4px;
-    }
-    /* Button focus */
-    button:focus-visible {
-      outline: 2px solid #22d3ee;
-      outline-offset: 2px;
+      font-family: system-ui, sans-serif;
+      background-color: #0f172a;
+      color: white;
     }
   </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-6">
-
-  <div class="max-w-4xl w-full bg-gradient-to-tr from-gray-900 via-gray-800 to-gray-900 rounded-3xl shadow-2xl p-8">
-    <header class="mb-10 text-center">
-      <h1 class="text-4xl font-extrabold text-cyan-400 drop-shadow-lg">أداة فحص الشبكة والمنافذ المتقدمة</h1>
-      <p class="mt-2 text-gray-400 text-lg max-w-xl mx-auto">فحص الشبكة، كشف الأجهزة، تحديد المنافذ المفتوحة، وقطع الاتصال بسهولة.</p>
-    </header>
-
-    <form id="scanForm" class="mb-8 flex flex-col md:flex-row gap-4 items-center justify-center">
-      <input
-        type="text"
-        id="ipRange"
-        placeholder="مثال: 192.168.1.1/24"
-        value="192.168.1.1/24"
-        class="flex-grow bg-gray-700 text-white placeholder-gray-400 rounded-xl px-5 py-3 focus:outline-none focus:ring-4 focus:ring-cyan-500 shadow-md transition"
-        required
-      />
-      <button
-        type="submit"
-        id="scanBtn"
-        class="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white font-semibold rounded-xl px-8 py-3 shadow-lg transform transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-400"
-      >
-        🔍 فحص الشبكة
-      </button>
+<body class="flex items-center justify-center min-h-screen p-6">
+  <div class="max-w-2xl w-full bg-gray-900 rounded-2xl p-8 shadow-lg">
+    <h1 class="text-3xl font-bold text-cyan-400 mb-6 text-center">🛡️ أداة فحص الشبكة</h1>
+    
+    <form id="scanForm" class="flex flex-col md:flex-row gap-4">
+      <input type="text" id="ipRange" placeholder="192.168.1.1/24"
+        class="flex-grow bg-gray-700 px-4 py-2 rounded-lg text-white focus:outline-none" />
+      <button type="submit"
+        class="bg-cyan-600 hover:bg-cyan-700 px-6 py-2 rounded-lg text-white font-semibold">ابدأ الفحص</button>
     </form>
 
-    <p id="loading" class="text-center text-cyan-400 mb-6 hidden">⏳ جاري الفحص، يرجى الانتظار...</p>
-
-    <div id="resultSection" class="overflow-x-auto max-h-[450px] rounded-xl shadow-inner bg-gray-900 p-4 hidden">
-      <table class="min-w-full text-right border-collapse">
-        <thead>
-          <tr class="bg-gray-700 text-gray-300 sticky top-0">
-            <th class="px-6 py-3 border border-gray-600">عنوان الـ IP</th>
-            <th class="px-6 py-3 border border-gray-600">البورتات المفتوحة</th>
-            <th class="px-6 py-3 border border-gray-600">الإجراءات</th>
-          </tr>
-        </thead>
-        <tbody id="devicesBody" class="divide-y divide-gray-700"></tbody>
-      </table>
+    <div id="loading" class="mt-4 text-cyan-300 hidden">🔄 جاري الفحص...</div>
+    <div id="results" class="mt-4 hidden bg-gray-800 p-4 rounded-lg">
+      <pre id="output" class="whitespace-pre-wrap text-green-300 text-sm"></pre>
     </div>
   </div>
 
-<script>
-  const backendUrl = window.location.origin;
-  const scanForm = document.getElementById('scanForm');
-  const ipRangeInput = document.getElementById('ipRange');
-  const loadingText = document.getElementById('loading');
-  const resultSection = document.getElementById('resultSection');
-  const devicesBody = document.getElementById('devicesBody');
+  <script>
+    const form = document.getElementById('scanForm');
+    const ipInput = document.getElementById('ipRange');
+    const loading = document.getElementById('loading');
+    const results = document.getElementById('results');
+    const output = document.getElementById('output');
 
-  scanForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const ipRange = ipRangeInput.value.trim();
-    if (!ipRange) {
-      alert('رجاءً أدخل نطاق IP صحيح');
-      return;
-    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ipRange = ipInput.value.trim();
+      if (!ipRange) return;
 
-    devicesBody.innerHTML = '';
-    resultSection.classList.add('hidden');
-    loadingText.classList.remove('hidden');
+      loading.classList.remove('hidden');
+      results.classList.add('hidden');
+      output.textContent = '';
 
-    try {
-      const scanRes = await fetch(`${backendUrl}/scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ipRange }),
-      });
-      const scanData = await scanRes.json();
-      if (scanData.error) {
-        alert('خطأ في الفحص: ' + scanData.error);
-        loadingText.classList.add('hidden');
-        return;
-      }
-
-      const devices = scanData.devices;
-      if (!devices.length) {
-        alert('لم يتم العثور على أجهزة في الشبكة.');
-        loadingText.classList.add('hidden');
-        return;
-      }
-
-      for (const device of devices) {
-        const row = document.createElement('tr');
-        row.classList.add('hover:bg-gray-700', 'transition-colors');
-
-        // مؤقتًا نعرض "جار فحص البورتات"
-        row.innerHTML = `
-          <td class="border border-gray-600 px-6 py-3">${device.ip}</td>
-          <td class="border border-gray-600 px-6 py-3 text-cyan-400 font-mono">جارِ الفحص...</td>
-          <td class="border border-gray-600 px-6 py-3 text-center">
-            <button disabled
-              class="bg-red-600 cursor-not-allowed text-white px-4 py-1 rounded-xl select-none"
-            >قطع الاتصال</button>
-          </td>
-        `;
-        devicesBody.appendChild(row);
-
-        // نبدأ فحص البورتات
-        fetch(`${backendUrl}/scanPorts`, {
+      try {
+        const res = await fetch('/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ip: device.ip }),
-        })
-          .then(res => res.json())
-          .then(portsData => {
-            let openPorts = 'لا بورتات مفتوحة';
-            if (portsData.error) {
-              openPorts = 'خطأ في الفحص';
-            } else if (portsData.ports && portsData.ports.length) {
-              const openPortNumbers = portsData.ports
-                .filter(p => p.state === 'open')
-                .map(p => p.port)
-                .join(', ');
-              openPorts = openPortNumbers || openPorts;
-            }
+          body: JSON.stringify({ ipRange })
+        });
 
-            row.cells[1].textContent = openPorts;
-
-            // زر القطع يصبح متاح
-            row.cells[2].innerHTML = `
-              <button
-                class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-4 py-1 rounded-xl font-semibold transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400"
-                onclick="blockDevice('${device.ip}', this)">قطع الاتصال
-              </button>
-            `;
-          })
-          .catch(() => {
-            row.cells[1].textContent = 'خطأ في الفحص';
-            row.cells[2].textContent = '-';
-          });
+        const data = await res.json();
+        output.textContent = data.result || 'لم يتم العثور على أجهزة.';
+        results.classList.remove('hidden');
+      } catch (err) {
+        output.textContent = '⚠️ حدث خطأ: ' + err.message;
+        results.classList.remove('hidden');
+      } finally {
+        loading.classList.add('hidden');
       }
+    });
+  </script>
 
-      resultSection.classList.remove('hidden');
-    } catch (err) {
-      alert('حدث خطأ أثناء الفحص: ' + err.message);
-    } finally {
-      loadingText.classList.add('hidden');
-    }
-  });
+  <!-- الكود التالي يفترض أن تنقله لملف اسمه server.js -->
+  <!-- لا يمكن تشغيله مباشرة من المتصفح -->
+  <script type="text/plain" id="server-js">
+// server.js
+const express = require('express');
+const path = require('path');
+const bodyParser = require('body-parser');
+const app = express();
+const port = 3000;
 
-  async function blockDevice(ip, btn) {
-    if (!confirm(`هل أنت متأكد من قطع الاتصال عن الجهاز ${ip}؟`)) return;
-    btn.disabled = true;
-    btn.textContent = 'جارٍ التنفيذ...';
-    try {
-      const res = await fetch(`${backendUrl}/block`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip }),
-      });
-      const data = await res.json();
-      alert(data.message || 'تمت العملية');
-    } catch (err) {
-      alert('حدث خطأ أثناء محاولة قطع الاتصال: ' + err.message);
-    } finally {
-      btn.textContent = 'قطع الاتصال';
-      btn.disabled = false;
-    }
-  }
-</script>
+app.use(bodyParser.json());
+app.use(express.static(__dirname));
+
+app.post('/scan', (req, res) => {
+  const { ipRange } = req.body;
+  const fakeResult = `
+تم العثور على الأجهزة في ${ipRange}:
+- 192.168.1.2 ✅
+- 192.168.1.5 ✅
+- 192.168.1.10 ✅
+(نتائج وهمية - استخدم nmap للفحص الحقيقي)
+`.trim();
+
+  res.json({ result: fakeResult });
+});
+
+app.listen(port, () => {
+  console.log('🚀 السيرفر شغال على http://localhost:' + port);
+});
+  </script>
 
 </body>
 </html>
