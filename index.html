@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>فحص الشبكة والمنافذ</title>
+<style>
+  body {
+    background-color: #121212;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; padding: 20px;
+  }
+  h1 {
+    text-align: center;
+  }
+  #devices {
+    margin-top: 20px;
+    border-collapse: collapse;
+    width: 100%;
+  }
+  #devices th, #devices td {
+    border: 1px solid #333;
+    padding: 8px;
+    text-align: center;
+  }
+  #devices th {
+    background-color: #1f1f1f;
+  }
+  button {
+    background-color: #bb86fc;
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    margin: 5px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  button:hover {
+    background-color: #9a67ea;
+  }
+  #loading {
+    display: none;
+    text-align: center;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>فحص الشبكة والمنافذ</h1>
+
+<label for="ipRange">نطاق IP (مثال: 192.168.1.1/24): </label>
+<input type="text" id="ipRange" value="192.168.1.1/24" style="width: 200px; margin-left: 10px;" />
+
+<button onclick="scanNetwork()">فحص الشبكة</button>
+<div id="loading">جاري الفحص...</div>
+
+<table id="devices" style="display:none;">
+  <thead>
+    <tr>
+      <th>IP</th>
+      <th>البورتات المفتوحة</th>
+      <th>الإجراءات</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const backendUrl = 'http://localhost:3000'; // غيّر هذا لعنوان سيرفرك الحقيقي
+
+async function scanNetwork() {
+  const ipRange = document.getElementById('ipRange').value.trim();
+  if (!ipRange) {
+    alert('رجاءً أدخل نطاق IP صحيح');
+    return;
+  }
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('devices').style.display = 'none';
+
+  try {
+    const res = await fetch(`${backendUrl}/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ipRange }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert('خطأ: ' + data.error);
+      document.getElementById('loading').style.display = 'none';
+      return;
+    }
+
+    const devices = data.devices;
+    const tbody = document.querySelector('#devices tbody');
+    tbody.innerHTML = '';
+
+    for (const device of devices) {
+      // لكل جهاز، نفحص البورتات
+      const portsRes = await fetch(`${backendUrl}/scanPorts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: device.ip }),
+      });
+      const portsData = await portsRes.json();
+      let openPorts = 'غير متوفر';
+      if (!portsData.error && portsData.ports && portsData.ports.length > 0) {
+        openPorts = portsData.ports
+          .map(p => `${p.port}:${p.state}`)
+          .filter(p => p.includes('open'))
+          .map(p => p.split(':')[0])
+          .join(', ');
+        if (!openPorts) openPorts = 'لا بورتات مفتوحة';
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${device.ip}</td>
+        <td>${openPorts}</td>
+        <td><button onclick="blockDevice('${device.ip}')">قطع الاتصال</button></td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    document.getElementById('devices').style.display = 'table';
+  } catch (error) {
+    alert('حدث خطأ أثناء الفحص: ' + error.message);
+  }
+  document.getElementById('loading').style.display = 'none';
+}
+
+async function blockDevice(ip) {
+  if (!confirm(`هل أنت متأكد من قطع الاتصال عن الجهاز ${ip}؟`)) return;
+
+  try {
+    const res = await fetch(`${backendUrl}/block`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip }),
+    });
+    const data = await res.json();
+    alert(data.message || 'تمت العملية');
+  } catch (error) {
+    alert('حدث خطأ أثناء محاولة قطع الاتصال: ' + error.message);
+  }
+}
+</script>
+
+</body>
+</html>
