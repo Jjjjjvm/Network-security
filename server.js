@@ -1,41 +1,31 @@
+
 // server.js
 const express = require('express');
-const cors = require('cors');
-const { exec } = require('child_process');
 const path = require('path');
-
+const bodyParser = require('body-parser');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = 3000;
 
-app.use(cors());
-app.use(express.json());
-
-// خدمة الملفات الثابتة (واجهة المستخدم)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(bodyParser.json());
+app.use(express.static(__dirname));
 
 app.post('/scan', (req, res) => {
   const { ipRange } = req.body;
-  if (!ipRange) return res.status(400).json({ error: 'يرجى إدخال نطاق IP' });
+  const fakeResult = `
+تم العثور على الأجهزة في ${ipRange}:
+- 192.168.1.2 ✅
+- 192.168.1.5 ✅
+- 192.168.1.10 ✅
+(نتائج وهمية - استخدم nmap للفحص الحقيقي)
+`.trim();
 
-  const nmapCmd = `nmap -sn ${ipRange}`;
-  exec(nmapCmd, (error, stdout) => {
-    if (error) return res.status(500).json({ error: 'خطأ في تنفيذ nmap: ' + error.message });
-
-    const regex = /Nmap scan report for ([0-9.]+)/g;
-    const devices = [];
-    let match;
-    while ((match = regex.exec(stdout)) !== null) devices.push({ ip: match[1] });
-    res.json({ devices });
-  });
+  res.json({ result: fakeResult });
 });
 
-app.post('/scanPorts', (req, res) => {
-  const { ip } = req.body;
-  if (!ip) return res.status(400).json({ error: 'يرجى إدخال IP' });
+app.listen(port, () => {
+  console.log('🚀 السيرفر شغال على http://localhost:' + port);
+});
+  </script>
 
-  const nmapCmd = `nmap -p 1-1000 ${ip}`;
-  exec(nmapCmd, (error, stdout) => {
-    if (error) return res.status(500).json({ error: 'خطأ في تنفيذ nmap: ' + error.message });
-
-    const ports = [];
-    const lines = st
+</body>
+</html>
