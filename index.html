@@ -9,67 +9,89 @@
   <style>
     body {
       font-family: 'Cairo', sans-serif;
-      background-color: #121212;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
       color: #e0e0e0;
+    }
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background-color: #0ea5e9;
+      border-radius: 4px;
+    }
+    /* Button focus */
+    button:focus-visible {
+      outline: 2px solid #22d3ee;
+      outline-offset: 2px;
     }
   </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body class="min-h-screen flex items-center justify-center p-6">
 
-  <div class="w-full max-w-3xl mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+  <div class="max-w-4xl w-full bg-gradient-to-tr from-gray-900 via-gray-800 to-gray-900 rounded-3xl shadow-2xl p-8">
+    <header class="mb-10 text-center">
+      <h1 class="text-4xl font-extrabold text-cyan-400 drop-shadow-lg">أداة فحص الشبكة والمنافذ المتقدمة</h1>
+      <p class="mt-2 text-gray-400 text-lg max-w-xl mx-auto">فحص الشبكة، كشف الأجهزة، تحديد المنافذ المفتوحة، وقطع الاتصال بسهولة.</p>
+    </header>
 
-    <div class="text-center mb-8">
-      <h1 class="text-3xl md:text-4xl font-bold text-cyan-400">أداة فحص الشبكة والمنافذ المتقدمة</h1>
-      <p class="text-gray-400 mt-2">أدخل نطاق IP لفحص الأجهزة والبورتات في الشبكة</p>
-    </div>
-
-    <div class="mb-6">
-      <label for="ipRange" class="block mb-2 text-sm font-medium text-gray-300">نطاق IP (مثال: 192.168.1.1/24)</label>
-      <input type="text" id="ipRange" value="192.168.1.1/24" class="bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block w-full p-2.5" />
-    </div>
-
-    <div class="text-center">
+    <form id="scanForm" class="mb-8 flex flex-col md:flex-row gap-4 items-center justify-center">
+      <input
+        type="text"
+        id="ipRange"
+        placeholder="مثال: 192.168.1.1/24"
+        value="192.168.1.1/24"
+        class="flex-grow bg-gray-700 text-white placeholder-gray-400 rounded-xl px-5 py-3 focus:outline-none focus:ring-4 focus:ring-cyan-500 shadow-md transition"
+        required
+      />
       <button
+        type="submit"
         id="scanBtn"
-        class="w-full md:w-1/3 text-white bg-cyan-600 hover:bg-cyan-700 focus:ring-4 focus:outline-none focus:ring-cyan-800 font-medium rounded-lg text-lg px-5 py-3 text-center transition-transform transform hover:scale-105"
+        class="bg-cyan-600 hover:bg-cyan-700 active:bg-cyan-800 text-white font-semibold rounded-xl px-8 py-3 shadow-lg transform transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-400"
       >
-        فحص الشبكة
+        🔍 فحص الشبكة
       </button>
+    </form>
+
+    <p id="loading" class="text-center text-cyan-400 mb-6 hidden">⏳ جاري الفحص، يرجى الانتظار...</p>
+
+    <div id="resultSection" class="overflow-x-auto max-h-[450px] rounded-xl shadow-inner bg-gray-900 p-4 hidden">
+      <table class="min-w-full text-right border-collapse">
+        <thead>
+          <tr class="bg-gray-700 text-gray-300 sticky top-0">
+            <th class="px-6 py-3 border border-gray-600">عنوان الـ IP</th>
+            <th class="px-6 py-3 border border-gray-600">البورتات المفتوحة</th>
+            <th class="px-6 py-3 border border-gray-600">الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="devicesBody" class="divide-y divide-gray-700"></tbody>
+      </table>
     </div>
-
-    <p id="loading" class="text-center text-cyan-400 mt-4 hidden">⏳ جاري الفحص، يرجى الانتظار...</p>
-
-    <table id="devices" class="mt-6 w-full text-center border-collapse hidden">
-      <thead>
-        <tr class="bg-gray-700">
-          <th class="border border-gray-600 px-4 py-2">IP</th>
-          <th class="border border-gray-600 px-4 py-2">البورتات المفتوحة</th>
-          <th class="border border-gray-600 px-4 py-2">الإجراءات</th>
-        </tr>
-      </thead>
-      <tbody class="bg-gray-900" id="devicesBody"></tbody>
-    </table>
-
   </div>
 
 <script>
   const backendUrl = window.location.origin;
-
-  const scanBtn = document.getElementById('scanBtn');
-  const loadingText = document.getElementById('loading');
-  const devicesTable = document.getElementById('devices');
-  const devicesBody = document.getElementById('devicesBody');
+  const scanForm = document.getElementById('scanForm');
   const ipRangeInput = document.getElementById('ipRange');
+  const loadingText = document.getElementById('loading');
+  const resultSection = document.getElementById('resultSection');
+  const devicesBody = document.getElementById('devicesBody');
 
-  scanBtn.addEventListener('click', async () => {
+  scanForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
     const ipRange = ipRangeInput.value.trim();
     if (!ipRange) {
       alert('رجاءً أدخل نطاق IP صحيح');
       return;
     }
-    devicesTable.classList.add('hidden');
-    loadingText.classList.remove('hidden');
+
     devicesBody.innerHTML = '';
+    resultSection.classList.add('hidden');
+    loadingText.classList.remove('hidden');
 
     try {
       const scanRes = await fetch(`${backendUrl}/scan`, {
@@ -92,48 +114,57 @@
       }
 
       for (const device of devices) {
-        let openPorts = 'جار الفحص...';
         const row = document.createElement('tr');
-        row.classList.add('border', 'border-gray-700');
+        row.classList.add('hover:bg-gray-700', 'transition-colors');
 
+        // مؤقتًا نعرض "جار فحص البورتات"
         row.innerHTML = `
-          <td class="border border-gray-600 px-4 py-2">${device.ip}</td>
-          <td class="border border-gray-600 px-4 py-2">${openPorts}</td>
-          <td class="border border-gray-600 px-4 py-2">جار الفحص...</td>
+          <td class="border border-gray-600 px-6 py-3">${device.ip}</td>
+          <td class="border border-gray-600 px-6 py-3 text-cyan-400 font-mono">جارِ الفحص...</td>
+          <td class="border border-gray-600 px-6 py-3 text-center">
+            <button disabled
+              class="bg-red-600 cursor-not-allowed text-white px-4 py-1 rounded-xl select-none"
+            >قطع الاتصال</button>
+          </td>
         `;
         devicesBody.appendChild(row);
 
-        try {
-          const portsRes = await fetch(`${backendUrl}/scanPorts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ip: device.ip }),
-          });
-          const portsData = await portsRes.json();
-          if (portsData.error) {
-            openPorts = 'خطأ في الفحص';
-          } else if (portsData.ports && portsData.ports.length) {
-            const openPortNumbers = portsData.ports
-              .filter(p => p.state === 'open')
-              .map(p => p.port)
-              .join(', ');
-            openPorts = openPortNumbers || 'لا بورتات مفتوحة';
-          } else {
-            openPorts = 'لا بورتات مفتوحة';
-          }
+        // نبدأ فحص البورتات
+        fetch(`${backendUrl}/scanPorts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip: device.ip }),
+        })
+          .then(res => res.json())
+          .then(portsData => {
+            let openPorts = 'لا بورتات مفتوحة';
+            if (portsData.error) {
+              openPorts = 'خطأ في الفحص';
+            } else if (portsData.ports && portsData.ports.length) {
+              const openPortNumbers = portsData.ports
+                .filter(p => p.state === 'open')
+                .map(p => p.port)
+                .join(', ');
+              openPorts = openPortNumbers || openPorts;
+            }
 
-          row.cells[1].textContent = openPorts;
-          row.cells[2].innerHTML = `<button
-            class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg transition-transform transform hover:scale-105"
-            onclick="blockDevice('${device.ip}', this)">قطع الاتصال
-          </button>`;
-        } catch {
-          row.cells[1].textContent = 'خطأ في الفحص';
-          row.cells[2].textContent = '-';
-        }
+            row.cells[1].textContent = openPorts;
+
+            // زر القطع يصبح متاح
+            row.cells[2].innerHTML = `
+              <button
+                class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-4 py-1 rounded-xl font-semibold transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400"
+                onclick="blockDevice('${device.ip}', this)">قطع الاتصال
+              </button>
+            `;
+          })
+          .catch(() => {
+            row.cells[1].textContent = 'خطأ في الفحص';
+            row.cells[2].textContent = '-';
+          });
       }
 
-      devicesTable.classList.remove('hidden');
+      resultSection.classList.remove('hidden');
     } catch (err) {
       alert('حدث خطأ أثناء الفحص: ' + err.message);
     } finally {
@@ -153,10 +184,9 @@
       });
       const data = await res.json();
       alert(data.message || 'تمت العملية');
-      btn.textContent = 'قطع الاتصال';
-      btn.disabled = false;
     } catch (err) {
       alert('حدث خطأ أثناء محاولة قطع الاتصال: ' + err.message);
+    } finally {
       btn.textContent = 'قطع الاتصال';
       btn.disabled = false;
     }
